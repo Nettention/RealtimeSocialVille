@@ -1,0 +1,7 @@
+[marshaler(cs)=SngClient.Marshaler]
+global SocialGameC2S 3000
+{
+	RequestLogon([in] String villeName,[in] bool isNewVille);
+	RequestAddTree([in] UnityEngine.Vector3 position);
+	RequestRemoveTree([in] int treeID);
+}

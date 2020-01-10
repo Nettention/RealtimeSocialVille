@@ -1,0 +1,7 @@
+[marshaler(cs)=SngClient.Marshaler]
+global SocialGameS2C 4000
+{
+	ReplyLogon([in] int groupID, [in] int result, [in] String comment);
+	NotifyAddTree([in] int groupID, [in] int treeID, [in] UnityEngine.Vector3 position);
+	NotifyRemoveTree([in] int groupID, [in] int treeID);
+}
