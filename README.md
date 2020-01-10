@@ -7,4 +7,4 @@
 # 주의
 
 튜토리얼 동영상의 내용은 최신 프라우드넷 릴리즈 버전과 호환되지 않을 수 있습니다. 이때는 
-[프라우드넷 공식 카페](http://cafe.naver.com/proudnet) 혹은 [이슈 제보](http://ndn.nettention.com)를 해주시거나, 여러분이 보완하고 나서 pull request를 해주시면 감사하겠습니다.
+여러분이 보완하고 나서 pull request를 해주시면 감사하겠습니다.
