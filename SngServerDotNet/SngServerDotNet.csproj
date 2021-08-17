@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net5.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SngCommon\SngCommon.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ProudDotNetClient">
+      <HintPath>..\..\ProudNet\lib\DotNet\ProudDotNetClient.dll</HintPath>
+    </Reference>
+    <Reference Include="ProudDotNetServer">
+      <HintPath>..\..\ProudNet\lib\DotNet\ProudDotNetServer.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>..\..\..\..\..\Program Files\Unity\Hub\Editor\2021.1.16f1\Editor\Data\Managed\UnityEngine.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="xcopy $(ProjectDir)..\..\ProudNet\lib\x64\dll\$(Configuration)\*.dll $(OutDir)\ /cdy&#xD;&#xA;xcopy $(ProjectDir)..\..\ProudNet\lib\DotNet\x64\*.dll $(OutDir)\ /cdy" />
+  </Target>
+
+</Project>
