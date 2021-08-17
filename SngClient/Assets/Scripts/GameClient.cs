@@ -1,9 +1,8 @@
-﻿using UnityEngine;
-using System.Collections;
-using Nettention.Proud;
+﻿using Nettention.Proud;
+using UnityEngine;
 
-public partial class GameClient : MonoBehaviour {
-
+public partial class GameClient : MonoBehaviour
+{
     string m_serverAddr = "localhost";
 
     // world name. you may consider it as user name.
@@ -26,21 +25,21 @@ public partial class GameClient : MonoBehaviour {
     SocialGameC2C.Proxy m_C2CProxy = new SocialGameC2C.Proxy();
     SocialGameC2C.Stub m_C2CStub = new SocialGameC2C.Stub();
 
-    enum State
+    public enum State
     {
-        Standby, 
-        Connecting, 
+        Standby,
+        Connecting,
         LoggingOn, // After connecting done. only connecting to server does net say logon completion.
         InVille, // after logon successful. in main game mode.
         Failed,
     }
 
-    State m_state = State.Standby;
+    public State m_state = State.Standby;
 
-	// Use this for initialization
-	void Start ()
+    // Use this for initialization
+    void Start()
     {
-        m_S2CStub.ReplyLogon = (Nettention.Proud.HostID remote, Nettention.Proud.RmiContext rmiContext, int groupID, int result, string comment) =>
+        m_S2CStub.ReplyLogon = (HostID remote, RmiContext rmiContext, int groupID, int result, string comment) =>
         {
             m_myP2PGroupID = (HostID)groupID;
 
@@ -57,10 +56,10 @@ public partial class GameClient : MonoBehaviour {
         };
 
         Start_InVilleRmiStub();
-	}
-	
-	// Update is called once per frame
-	void Update () 
+    }
+
+    // Update is called once per frame
+    void Update()
     {
         m_netClient.FrameMove();
 
@@ -70,7 +69,7 @@ public partial class GameClient : MonoBehaviour {
                 Update_InVille();
                 break;
         }
-	}
+    }
 
     public void OnDestroy()
     {
@@ -97,7 +96,7 @@ public partial class GameClient : MonoBehaviour {
                 }
                 break;
         }
-        
+
     }
 
     void OnGUI_Logon()
@@ -131,7 +130,7 @@ public partial class GameClient : MonoBehaviour {
 
         m_netClient.JoinServerCompleteHandler = (ErrorInfo info, ByteArray replyFromServer) =>
             {
-                if (info.errorType == ErrorType.ErrorType_Ok)
+                if (info.errorType == ErrorType.Ok)
                 {
                     m_state = State.LoggingOn;
                     m_loginButtonText = "Logging on...";
@@ -157,9 +156,8 @@ public partial class GameClient : MonoBehaviour {
         //fill parameters and go
         NetConnectionParam cp = new NetConnectionParam();
         cp.serverIP = m_serverAddr;
-        cp.clientAddrAtServer = "192.168.77.138";
         cp.serverPort = 15001;
-        cp.protocolVersion = new Nettention.Proud.Guid("{0x4ea36ea0,0x3900,0x4b1d,{0xbb,0xde,0x3f,0xbf,0x42,0xf4,0xa,0x6b}}");
+        cp.protocolVersion = new Guid("{0x4ea36ea0,0x3900,0x4b1d,{0xbb,0xde,0x3f,0xbf,0x42,0xf4,0xa,0x6b}}");
 
         m_netClient.Connect(cp);
     }

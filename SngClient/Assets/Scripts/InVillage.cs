@@ -1,6 +1,5 @@
-﻿using UnityEngine;
-using System.Collections;
-using Nettention.Proud;
+﻿using Nettention.Proud;
+using UnityEngine;
 
 public partial class GameClient : MonoBehaviour
 {

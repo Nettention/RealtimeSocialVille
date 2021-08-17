@@ -1,5 +1,0 @@
-[marshaler(cs)=SngClient.Marshaler]
-global SocialGameC2C 5000
-{
-	ScribblePoint([in] int groupID, [in] UnityEngine.Vector3 point);
-}

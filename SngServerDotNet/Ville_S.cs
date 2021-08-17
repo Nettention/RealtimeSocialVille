@@ -1,10 +1,6 @@
-﻿using System;
+﻿using Nettention.Proud;
+using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Nettention.Proud;
 
 namespace SngServer
 {
@@ -17,7 +13,7 @@ namespace SngServer
         }
 
         // the players who are online.
-        public ConcurrentDictionary<HostID, RemoteClient_S> m_players = new ConcurrentDictionary<HostID,RemoteClient_S>();
+        public Dictionary<HostID, RemoteClient_S> m_players = new();
 
         // ville name
         public String m_name;
@@ -27,7 +23,7 @@ namespace SngServer
         public int m_nextNewID;
 
         // world objects
-        public ConcurrentDictionary<int, WorldObject_S> m_worldObjects = new ConcurrentDictionary<int,WorldObject_S>();
+        public Dictionary<int, WorldObject_S> m_worldObjects = new();
 
         // every players in this ville are P2P communicated.
         // this is useful for lesser latency for cloud-hosting servers (e.g. Amazon AWS)

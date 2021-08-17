@@ -1,36 +1,31 @@
-﻿using System;
+﻿using Nettention.Proud;
+using System;
 using System.Collections.Generic;
-using System.Collections.Concurrent;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Threading;
-using Nettention.Proud;
 
 namespace SngServer
 {
-    public class SngServer
+    public class SngServer : IDisposable
     {
-        public bool m_runLoop;
+        public bool m_runLoop = true;
 
-        public NetServer m_netServer = new NetServer();
+        public NetServer m_netServer = new();
 
-        private Nettention.Proud.ThreadPool netWorkerThreadPool = new Nettention.Proud.ThreadPool(8);
-        private Nettention.Proud.ThreadPool userWorkerThreadPool = new Nettention.Proud.ThreadPool(8);
+        private readonly ThreadPool m_netWorkerThreadPool = new(8);
+        private readonly ThreadPool m_userWorkerThreadPool = new(8);
 
         // RMI proxy for server-to-client messaging
-        internal SocialGameS2C.Proxy m_S2CProxy = new SocialGameS2C.Proxy();
+        internal SocialGameS2C.Proxy m_S2CProxy = new();
         // RMI stub for client-to-server messaging
-        internal SocialGameC2S.Stub m_C2SStub = new SocialGameC2S.Stub();
+        internal SocialGameC2S.Stub m_C2SStub = new();
 
-        private ConcurrentDictionary<String, Ville_S> m_villes = new ConcurrentDictionary<string, Ville_S>();
+        internal object m_mutex = new();
+        private readonly Dictionary<String, Ville_S> m_villes = new();
         // guides which client is in which ville.
-        private ConcurrentDictionary<HostID, Ville_S> m_remoteClients = new ConcurrentDictionary<HostID, Ville_S>();
+        private readonly Dictionary<HostID, Ville_S> m_remoteClients = new();
 
         public SngServer()
         {
-            m_runLoop = true;
-
             m_netServer.AttachStub(m_C2SStub);
             m_netServer.AttachProxy(m_S2CProxy);
 
@@ -53,28 +48,24 @@ namespace SngServer
 
             m_netServer.ClientLeaveHandler = (NetClientInfo clientInfo, ErrorInfo errorinfo, ByteArray comment) =>
             {
-                Console.WriteLine("OnClientLeave: {0}", clientInfo.hostID);
-                
-                Monitor.Enter(this);
-
-                Ville_S ville;
-
-                // remove the client and play info, and then remove the ville if it is empty.
-                if (m_remoteClients.TryGetValue(clientInfo.hostID, out ville))
+                lock (m_mutex)
                 {
-                    RemoteClient_S clientValue;
-                    Ville_S villeValue;
+                    Console.WriteLine("OnClientLeave: {0}", clientInfo.hostID);
 
-                    ville.m_players.TryRemove(clientInfo.hostID, out clientValue);
-                    m_remoteClients.TryRemove(clientInfo.hostID, out villeValue);
+                    Ville_S ville;
 
-                    if (ville.m_players.Count == 0)
+                    // remove the client and play info, and then remove the ville if it is empty.
+                    if (m_remoteClients.TryGetValue(clientInfo.hostID, out ville))
                     {
-                        UnloadVille(ville);
+                        ville.m_players.Remove(clientInfo.hostID);
+                        m_remoteClients.Remove(clientInfo.hostID);
+
+                        if (ville.m_players.Count == 0)
+                        {
+                            UnloadVille(ville);
+                        }
                     }
                 }
-
-                Monitor.Exit(this);
             };
 
             m_netServer.ErrorHandler = (ErrorInfo errorInfo) =>
@@ -124,111 +115,107 @@ namespace SngServer
 
             m_C2SStub.RequestLogon = (HostID remote, RmiContext rmiContext, String villeName, bool isNewVille) =>
             {
-                Monitor.Enter(this);
-
-                // find the appropriate ville and join to it.
-                // if not found, then create a new ville.
-                Ville_S ville;
-                Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
-
-                if (!m_villes.TryGetValue(villeName, out ville))
+                lock (m_mutex)
                 {
-                    // create new one
-                    ville = new Ville_S();
-                    
-                    ville.m_p2pGroupID = m_netServer.CreateP2PGroup(list, new ByteArray()); // empty P2P groups. players will join it.
+                    // find the appropriate ville and join to it.
+                    // if not found, then create a new ville.
+                    Ville_S ville;
+                    Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
 
-                    Console.WriteLine("m_p2pGroupID : {0}", ville.m_p2pGroupID);
+                    if (!m_villes.TryGetValue(villeName, out ville))
+                    {
+                        // create new one
+                        ville = new Ville_S();
 
-                    NetClientInfo info = m_netServer.GetClientInfo(list.Last());
-                    Console.WriteLine("Client HostID : {0}, IP:Port : {1}:{2}", info.hostID, info.tcpAddrFromServer.IPToString(), info.tcpAddrFromServer.port);
+                        ville.m_p2pGroupID = m_netServer.CreateP2PGroup(list, new ByteArray()); // empty P2P groups. players will join it.
 
-                    // load ville info
-                    m_villes.TryAdd(villeName, ville);
-                    ville.m_name = villeName;
+                        Console.WriteLine("m_p2pGroupID : {0}", ville.m_p2pGroupID);
+
+                        NetClientInfo info = m_netServer.GetClientInfo(list.Last());
+                        Console.WriteLine("Client HostID : {0}, IP:Port : {1}:{2}", info.hostID, info.tcpAddrFromServer.IPToString(), info.tcpAddrFromServer.port);
+
+                        // load ville info
+                        m_villes.TryAdd(villeName, ville);
+                        ville.m_name = villeName;
+                    }
+
+                    m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, 0, ""); // success
+                    MoveRemoteClientToLoadedVille(remote, ville);
+
+                    return true; // any RMI stub implementation must always return true.
                 }
-
-                m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, 0, ""); // success
-                MoveRemoteClientToLoadedVille(remote, ville);
-
-                Monitor.Exit(this);
-
-                return true; // any RMI stub implementation must always return true.
             };
 
             m_C2SStub.RequestAddTree = (HostID remote, RmiContext rmiContext, UnityEngine.Vector3 position) =>
             {
-                Monitor.Enter(this);
-
-                // find the ville
-                Ville_S ville;
-                Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
-                WorldObject_S tree = new WorldObject_S();
-                if (m_remoteClients.TryGetValue(remote, out ville))
+                lock (m_mutex)
                 {
-                    // add the tree
-                    tree.m_position = position;
-                    tree.m_id = ville.m_nextNewID;
-                    ville.m_worldObjects.TryAdd(tree.m_id, tree);
-                    ville.m_nextNewID++;
-                }
-                else
-                {
-                    ville = new Ville_S();
-                }
+                    // find the ville
+                    Ville_S ville;
+                    Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
+                    WorldObject_S tree = new WorldObject_S();
+                    if (m_remoteClients.TryGetValue(remote, out ville))
+                    {
+                        // add the tree
+                        tree.m_position = position;
+                        tree.m_id = ville.m_nextNewID;
+                        ville.m_worldObjects.Add(tree.m_id, tree);
+                        ville.m_nextNewID++;
+                    }
+                    else
+                    {
+                        ville = new Ville_S();
+                    }
 
-                foreach (HostID id in list)
-                {
-                    // notify the tree's creation to users
-                    m_S2CProxy.NotifyAddTree(id, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id, tree.m_position);
+                    foreach (HostID id in list)
+                    {
+                        // notify the tree's creation to users
+                        m_S2CProxy.NotifyAddTree(id, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id, tree.m_position);
+                    }
+
+                    return true;
                 }
-
-                Monitor.Exit(this);
-
-                return true;
             };
 
             m_C2SStub.RequestRemoveTree = (HostID remote, RmiContext rmiContext, int treeID) =>
             {
-                Monitor.Enter(this);
-
-                // find the ville
-                Ville_S ville;
-                if (m_remoteClients.TryGetValue(remote, out ville))
+                lock (m_mutex)
                 {
-                    // find the tree
-                    WorldObject_S tree;
-                    if (ville.m_worldObjects.TryGetValue(treeID, out tree))
+                    // find the ville
+                    Ville_S ville;
+                    if (m_remoteClients.TryGetValue(remote, out ville))
                     {
-                        WorldObject_S obj;
-                        ville.m_worldObjects.TryRemove(treeID, out obj);
-
-                        Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
-                        foreach (HostID id in list)
+                        // find the tree
+                        WorldObject_S tree;
+                        if (ville.m_worldObjects.TryGetValue(treeID, out tree))
                         {
-                            // notify the tree's destruction to users
-                            m_S2CProxy.NotifyRemoveTree(id, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id);
+                            ville.m_worldObjects.Remove(treeID);
+
+                            Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
+                            foreach (HostID id in list)
+                            {
+                                // notify the tree's destruction to users
+                                m_S2CProxy.NotifyRemoveTree(id, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id);
+                            }
                         }
                     }
+
+                    return true;
                 }
-
-                Monitor.Exit(this);
-
-                return true;
             };
         }
 
         public void Start()
         {
             // fill server startup parameters
-            StartServerParameter sp = new StartServerParameter();
+            StartServerParameter sp = new();
             sp.protocolVersion = new Nettention.Proud.Guid(SngCommon.Vars.g_sngProtocolVersion);
             sp.tcpPorts = new IntArray();
             sp.tcpPorts.Add(SngCommon.Vars.g_serverPort); // must be same to the port number at client
-            sp.serverAddrAtClient = "192.168.77.138";
-            sp.localNicAddr = "192.168.77.138";
-            sp.SetExternalNetWorkerThreadPool(netWorkerThreadPool);
-            sp.SetExternalUserWorkerThreadPool(userWorkerThreadPool);
+            sp.udpPorts.Add(9000);
+            sp.serverAddrAtClient = "ec2-44-192-247-75.compute-1.amazonaws.com";
+            sp.SetExternalNetWorkerThreadPool(m_netWorkerThreadPool);
+            sp.SetExternalUserWorkerThreadPool(m_userWorkerThreadPool);
 
             //m_netServer.SetDefaultTimeoutTimeMs(1000 * 60 * 60);
             //m_netServer.SetMessageMaxLength(100000, 100000);
@@ -239,40 +226,44 @@ namespace SngServer
 
         public void MoveRemoteClientToLoadedVille(HostID remote, Ville_S ville)
         {
-            RemoteClient_S remoteClientValue;
-            Ville_S villeValue;
-
-            if (!ville.m_players.TryGetValue(remote, out remoteClientValue) && !m_remoteClients.TryGetValue(remote, out villeValue))
+            lock (m_mutex)
             {
-                ville.m_players.TryAdd(remote, new RemoteClient_S());
-                m_remoteClients.TryAdd(remote, ville);
-            }
+                RemoteClient_S remoteClientValue;
+                Ville_S villeValue;
 
-            // now, the player can do P2P communication with other player in the same ville.
-            m_netServer.JoinP2PGroup(remote, ville.m_p2pGroupID);
+                if (!ville.m_players.TryGetValue(remote, out remoteClientValue) && !m_remoteClients.TryGetValue(remote, out villeValue))
+                {
+                    ville.m_players.TryAdd(remote, new RemoteClient_S());
+                    m_remoteClients.TryAdd(remote, ville);
+                }
 
-            // notify current world state to new user
-            foreach (KeyValuePair<int, WorldObject_S> iWO in ville.m_worldObjects)
-            {
-                m_S2CProxy.NotifyAddTree(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, iWO.Value.m_id, iWO.Value.m_position);
+                // now, the player can do P2P communication with other player in the same ville.
+                m_netServer.JoinP2PGroup(remote, ville.m_p2pGroupID);
+
+                // notify current world state to new user
+                foreach (var iWorldObject in ville.m_worldObjects)
+                {
+                    m_S2CProxy.NotifyAddTree(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, iWorldObject.Value.m_id, iWorldObject.Value.m_position);
+                }
             }
         }
 
         public void UnloadVille(Ville_S ville)
         {
-            // ban the players in the ville
-            foreach (KeyValuePair<HostID, RemoteClient_S> iPlayer in ville.m_players)
+            lock (m_mutex)
             {
-                m_netServer.CloseConnection(iPlayer.Key);
+                // ban the players in the ville
+                foreach (KeyValuePair<HostID, RemoteClient_S> iPlayer in ville.m_players)
+                {
+                    m_netServer.CloseConnection(iPlayer.Key);
+                }
+
+                // shutdown the loaded ville
+                m_villes.Remove(ville.m_name);
+
+                // release the cached data tree
+                m_netServer.DestroyP2PGroup(ville.m_p2pGroupID);
             }
-
-            Ville_S villeValue;
-
-            // shutdown the loaded ville
-            m_villes.TryRemove(ville.m_name, out villeValue);
-
-            // release the cached data tree
-            m_netServer.DestroyP2PGroup(ville.m_p2pGroupID);
         }
 
         public void Dispose()
@@ -281,5 +272,5 @@ namespace SngServer
             m_netServer.Dispose();
         }
     }
-    
+
 }
