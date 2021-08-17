@@ -4,3 +4,5 @@
 /SngClient/Assets/Plugins/x64*.*
 /SngClient/Assets/Plugins/x64/
 /SngClient/Assets/Plugins/*.meta
+/.vs/RealtimeSocialVille/DesignTimeBuild/*.v2
+/.vs/RealtimeSocialVille/v16/*.suo
