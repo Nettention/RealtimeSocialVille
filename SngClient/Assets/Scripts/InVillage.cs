@@ -77,44 +77,57 @@ public partial class GameClient : MonoBehaviour
         }
     }
 
-    void Start_InVilleRmiStub()
+    bool ReplyLogon(HostID remote, RmiContext rmiContext, int groupID, int result, string comment)
     {
-        m_S2CStub.NotifyAddTree = (Nettention.Proud.HostID remote, Nettention.Proud.RmiContext rmiContext, int groupID, int treeID, UnityEngine.Vector3 position) =>
+        m_myP2PGroupID = (HostID)groupID;
+
+        if (result == 0) // ok
         {
-            if ((int)m_myP2PGroupID == groupID)
-            {
-                // plant a tree
-                GameObject o = (GameObject)Instantiate(m_treePrefab, position, Quaternion.identity);
-                WorldObject t = (WorldObject)o.GetComponent(typeof(WorldObject));
-                t.m_id = treeID;
-            }
-
-            return true;
-        };
-
-        m_S2CStub.NotifyRemoveTree = (Nettention.Proud.HostID RemoteOfflineEventArgs, Nettention.Proud.RmiContext rmiContext, int groupID, int treeID) =>
+            m_state = State.InVille;
+        }
+        else
         {
-            if ((int)m_myP2PGroupID == groupID)
-            {
-                // destroy picked tree
-                WorldObject wo;
-                if (WorldObject.m_worldObjects.TryGetValue(treeID, out wo))
-                {
-                    Destroy(wo.gameObject);
-                }
-            }
+            m_state = State.Failed;
+            m_failMessage = "Logon failed. Error=" + comment;
+        }
+        return true;
+    }
 
-            return true;
-        };
-
-        m_C2CStub.ScribblePoint = (Nettention.Proud.HostID remote, Nettention.Proud.RmiContext rmiContext, int groupID, UnityEngine.Vector3 point) =>
+    bool NotifyAddTree(HostID remote, RmiContext rmiContext, int groupID, int treeID, UnityEngine.Vector3 position)
+    {
+        if ((int)m_myP2PGroupID == groupID)
         {
-            if ((int)m_myP2PGroupID == groupID)
-            {
-                Instantiate(m_scribblePrefab, point, Quaternion.identity);
-            }
+            // plant a tree
+            GameObject o = (GameObject)Instantiate(m_treePrefab, position, Quaternion.identity);
+            WorldObject t = (WorldObject)o.GetComponent(typeof(WorldObject));
+            t.m_id = treeID;
+        }
 
-            return true;
-        };
+        return true;
+    }
+
+    bool NotifyRemoveTree(HostID RemoteOfflineEventArgs, RmiContext rmiContext, int groupID, int treeID)
+    {
+        if ((int)m_myP2PGroupID == groupID)
+        {
+            // destroy picked tree
+            WorldObject wo;
+            if (WorldObject.m_worldObjects.TryGetValue(treeID, out wo))
+            {
+                Destroy(wo.gameObject);
+            }
+        }
+
+        return true;
+    }
+
+    bool ScribblePoint(HostID remote, RmiContext rmiContext, int groupID, UnityEngine.Vector3 point)
+    {
+        if ((int)m_myP2PGroupID == groupID)
+        {
+            Instantiate(m_scribblePrefab, point, Quaternion.identity);
+        }
+
+        return true;
     }
 }

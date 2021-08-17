@@ -39,23 +39,10 @@ public partial class GameClient : MonoBehaviour
     // Use this for initialization
     void Start()
     {
-        m_S2CStub.ReplyLogon = (HostID remote, RmiContext rmiContext, int groupID, int result, string comment) =>
-        {
-            m_myP2PGroupID = (HostID)groupID;
-
-            if (result == 0) // ok
-            {
-                m_state = State.InVille;
-            }
-            else
-            {
-                m_state = State.Failed;
-                m_failMessage = "Logon failed. Error=" + comment;
-            }
-            return true;
-        };
-
-        Start_InVilleRmiStub();
+        m_S2CStub.ReplyLogon = ReplyLogon;
+        m_S2CStub.NotifyAddTree = NotifyAddTree;
+        m_S2CStub.NotifyRemoveTree = NotifyRemoveTree;
+        m_C2CStub.ScribblePoint = ScribblePoint;
     }
 
     // Update is called once per frame
