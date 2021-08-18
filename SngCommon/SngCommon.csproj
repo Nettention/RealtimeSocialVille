@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="..\..\ProudNet\util\PIDL.exe -cs SocialGameC2C.PIDL -outdir .&#xD;&#xA;..\..\ProudNet\util\PIDL.exe -cs SocialGameC2S.PIDL -outdir .&#xD;&#xA;..\..\ProudNet\util\PIDL.exe -cs SocialGameS2C.PIDL -outdir .&#xD;&#xA;" />
+    <Exec Command="echo Compiling PIDL files...&#xD;&#xA;..\..\ProudNet\util\PIDL.exe -cs SocialGameC2C.PIDL -outdir .&#xD;&#xA;..\..\ProudNet\util\PIDL.exe -cs SocialGameC2S.PIDL -outdir .&#xD;&#xA;..\..\ProudNet\util\PIDL.exe -cs SocialGameS2C.PIDL -outdir .&#xD;&#xA;" />
   </Target>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

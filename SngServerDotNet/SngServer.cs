@@ -93,7 +93,7 @@ namespace SngServer
             {
                 if(m_clientToVilleMap.TryGetValue(remote, out var ville)==true)
                 {
-                    m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)0, 0, "Already in a Ville."); // success
+                    m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)0, false, "Already in a Ville."); // success
                     return true;
                 }
 
@@ -124,12 +124,12 @@ namespace SngServer
                 // now, the player can do P2P communication with other player in the same ville.
                 m_netServer.JoinP2PGroup(remote, ville.m_p2pGroupID);
 
-                m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, 0, ""); // success
+                m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, true, ""); // success
 
                 // notify current world state to new user
                 foreach (var obj in ville.m_worldObjects)
                 {
-                    m_S2CProxy.NotifyAddTree(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, obj.Value.m_id, obj.Value.m_position);
+                    m_S2CProxy.NotifyAddTree(remote, RmiContext.ReliableSend, obj.Value.m_id, obj.Value.m_position);
                 }
 
                 return true; // any RMI stub implementation must always return true.
@@ -153,7 +153,7 @@ namespace SngServer
                 ville.m_nextNewID++;
 
                 // notify the tree's creation to users
-                m_S2CProxy.NotifyAddTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id, tree.m_position);
+                m_S2CProxy.NotifyAddTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, tree.m_id, tree.m_position);
 
                 return true;
             }
@@ -168,7 +168,7 @@ namespace SngServer
                 if (m_clientToVilleMap.TryGetValue(remote, out ville) == false)
                     return true;    // nothing to do. just end this function.
 
-                // find and remove the tree
+                // find the tree
                 WorldObject_S tree;
                 if (ville.m_worldObjects.TryGetValue(treeID, out tree) == false)
                     return true;
@@ -176,7 +176,7 @@ namespace SngServer
                 ville.m_worldObjects.Remove(treeID);
 
                 // notify the tree's destruction to users
-                m_S2CProxy.NotifyRemoveTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id);
+                m_S2CProxy.NotifyRemoveTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, tree.m_id);
 
                 return true;
             }
