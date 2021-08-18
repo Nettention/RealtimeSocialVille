@@ -35,54 +35,56 @@ namespace SngServer
                 Console.WriteLine("OnClientJoin: {0}", clientInfo.hostID);
             };
 
-            m_netServer.ClientLeaveHandler = (NetClientInfo clientInfo, ErrorInfo errorinfo, ByteArray comment) =>
-            {
-                lock (m_mutex)
-                {
-                    Console.WriteLine("OnClientLeave: {0}", clientInfo.hostID);
-
-                    // remove the client and play info, and then remove the ville if it is empty.
-                    if (m_clientToVilleMap.TryGetValue(clientInfo.hostID, out var ville))
-                    {
-                        ville.m_players.Remove(clientInfo.hostID);
-                        m_clientToVilleMap.Remove(clientInfo.hostID);
-
-                        if (ville.m_players.Count == 0)
-                        {
-                            UnloadVille(ville);
-                        }
-                    }
-                }
-            };
+            m_netServer.ClientLeaveHandler = OnClientLeave; 
 
             m_netServer.ErrorHandler = (ErrorInfo errorInfo) =>
             {
-                Console.WriteLine("OnError! {0}", errorInfo.ToString());
+                Console.WriteLine($"OnError: {errorInfo}");
             };
 
             m_netServer.WarningHandler = (ErrorInfo errorInfo) =>
             {
-                Console.WriteLine("OnWarning! {0}", errorInfo.ToString());
+                Console.WriteLine($"OnWarning: {errorInfo}");
             };
 
             m_netServer.ExceptionHandler = (Exception e) =>
             {
-                Console.WriteLine("OnWarning! {0}", e.Message.ToString());
+                Console.WriteLine($"OnWarning: {e.Message}");
             };
 
             m_netServer.InformationHandler = (ErrorInfo errorInfo) =>
             {
-                Console.WriteLine("OnInformation! {0}", errorInfo.ToString());
+                Console.WriteLine($"OnInformation: {errorInfo}");
             };
 
             m_netServer.NoRmiProcessedHandler = (RmiID rmiID) =>
             {
-                Console.WriteLine("OnNoRmiProcessed! {0}", rmiID);
+                Console.WriteLine($"OnNoRmiProcessed: {rmiID}");
             };
 
             m_C2SStub.RequestLogon = RequestLogon;
             m_C2SStub.RequestAddTree = RequestAddTree;
             m_C2SStub.RequestRemoveTree = RequestRemoveTree;
+        }
+
+        void OnClientLeave(NetClientInfo clientInfo, ErrorInfo errorinfo, ByteArray comment)
+        {
+            lock (m_mutex)
+            {
+                Console.WriteLine("OnClientLeave: {0}", clientInfo.hostID);
+
+                // remove the client and play info, and then remove the ville if it is empty.
+                if (m_clientToVilleMap.TryGetValue(clientInfo.hostID, out var ville))
+                {
+                    ville.m_players.Remove(clientInfo.hostID);
+                    m_clientToVilleMap.Remove(clientInfo.hostID);
+
+                    if (ville.m_players.Count == 0)
+                    {
+                        UnloadVille(ville);
+                    }
+                }
+            }
         }
 
         bool RequestLogon(HostID remote, RmiContext rmiContext, String villeName, bool isNewVille)
@@ -139,27 +141,19 @@ namespace SngServer
             lock (m_mutex)
             {
                 // find the ville
-                Ville_S ville;
-                Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
-                WorldObject_S tree = new WorldObject_S();
-                if (m_clientToVilleMap.TryGetValue(remote, out ville))
-                {
-                    // add the tree
-                    tree.m_position = position;
-                    tree.m_id = ville.m_nextNewID;
-                    ville.m_worldObjects.Add(tree.m_id, tree);
-                    ville.m_nextNewID++;
-                }
-                else
-                {
-                    ville = new Ville_S();
-                }
+                if (m_clientToVilleMap.TryGetValue(remote, out var ville) == false)
+                    return true;    // nothing to do. just end this function.
 
-                foreach (HostID id in list)
-                {
-                    // notify the tree's creation to users
-                    m_S2CProxy.NotifyAddTree(id, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id, tree.m_position);
-                }
+                // add the tree
+                WorldObject_S tree = new();
+                tree.m_position = position;
+                tree.m_id = ville.m_nextNewID;
+
+                ville.m_worldObjects.Add(tree.m_id, tree);
+                ville.m_nextNewID++;
+
+                // notify the tree's creation to users
+                m_S2CProxy.NotifyAddTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id, tree.m_position);
 
                 return true;
             }
@@ -171,26 +165,23 @@ namespace SngServer
             {
                 // find the ville
                 Ville_S ville;
-                if (m_clientToVilleMap.TryGetValue(remote, out ville))
-                {
-                    // find the tree
-                    WorldObject_S tree;
-                    if (ville.m_worldObjects.TryGetValue(treeID, out tree))
-                    {
-                        ville.m_worldObjects.Remove(treeID);
+                if (m_clientToVilleMap.TryGetValue(remote, out ville) == false)
+                    return true;    // nothing to do. just end this function.
 
-                        Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
-                        foreach (HostID id in list)
-                        {
-                            // notify the tree's destruction to users
-                            m_S2CProxy.NotifyRemoveTree(id, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id);
-                        }
-                    }
-                }
+                // find and remove the tree
+                WorldObject_S tree;
+                if (ville.m_worldObjects.TryGetValue(treeID, out tree) == false)
+                    return true;
+
+                ville.m_worldObjects.Remove(treeID);
+
+                // notify the tree's destruction to users
+                m_S2CProxy.NotifyRemoveTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, (int)ville.m_p2pGroupID, tree.m_id);
 
                 return true;
             }
         }
+
         public void Start()
         {
             // each Ville will have an empty P2P group first, so we allow empty P2P group option.
