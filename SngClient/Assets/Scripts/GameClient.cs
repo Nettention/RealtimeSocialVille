@@ -14,7 +14,6 @@ public partial class GameClient : MonoBehaviour
     // uses while the scene is 'error mode'
     public string m_failMessage = "";
 
-    // #1
     NetClient m_netClient = new NetClient();
 
     // for sending client-to-server messages
@@ -116,7 +115,6 @@ public partial class GameClient : MonoBehaviour
         m_netClient.AttachProxy(m_C2CProxy);
         m_netClient.AttachStub(m_C2CStub);
        
-        // #2
         m_netClient.JoinServerCompleteHandler = (ErrorInfo info, ByteArray replyFromServer) =>
             {
                 if (info.errorType == ErrorType.Ok)
@@ -141,7 +139,6 @@ public partial class GameClient : MonoBehaviour
                 m_failMessage = "Disconnected from server: " + info.errorType.ToString();
             };
 
-        // #3
         //fill parameters and go
         NetConnectionParam cp = new NetConnectionParam();
         cp.serverIP = m_serverAddr;
