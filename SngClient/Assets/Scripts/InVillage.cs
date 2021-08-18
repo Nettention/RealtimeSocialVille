@@ -39,15 +39,13 @@ public partial class GameClient : MonoBehaviour
                         // request to plant a tree
                         m_C2SProxy.RequestAddTree(HostID.HostID_Server, RmiContext.ReliableSend, hit.point);
                     }
-                    else if (pickedObject.name.Contains("Tree")) // Unity names "Tree (Clone)" e.g.
+                    else if (pickedObject.name.StartsWith("Tree:"))
                     {
-                        // request to delete th tree
-                        WorldObject wo = (WorldObject)pickedObject.GetComponent(typeof(WorldObject));
-                        if (wo != null)
-                        {
-                            int treeID = wo.m_id;
-                            m_C2SProxy.RequestRemoveTree(HostID.HostID_Server, RmiContext.ReliableSend, treeID);
-                        }
+                        // request to delete the tree
+                        var wo = pickedObject.GetComponent<WorldObject>();
+ 
+                        int treeID = wo.m_id;
+                        m_C2SProxy.RequestRemoveTree(HostID.HostID_Server, RmiContext.ReliableSend, treeID);
                     }
                 }
             }
@@ -101,20 +99,24 @@ public partial class GameClient : MonoBehaviour
             GameObject o = (GameObject)Instantiate(m_treePrefab, position, Quaternion.identity);
             WorldObject t = (WorldObject)o.GetComponent(typeof(WorldObject));
             t.m_id = treeID;
+            t.name = $"Tree:{treeID}";
         }
 
         return true;
     }
 
+
     bool NotifyRemoveTree(HostID RemoteOfflineEventArgs, RmiContext rmiContext, int groupID, int treeID)
     {
         if ((int)m_myP2PGroupID == groupID)
         {
-            // destroy picked tree
-            WorldObject wo;
-            if (WorldObject.m_worldObjects.TryGetValue(treeID, out wo))
+            // destroy the tree that server commands to remove.
+            var tree = GameObject.Find($"Tree:{treeID}");
+
+            if (tree != null)
             {
-                Destroy(wo.gameObject);
+
+                Destroy(tree);
             }
         }
 

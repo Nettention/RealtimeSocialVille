@@ -144,6 +144,7 @@ public partial class GameClient : MonoBehaviour
         cp.serverIP = m_serverAddr;
         cp.serverPort = 15001;
         cp.protocolVersion = new Guid("{0x4ea36ea0,0x3900,0x4b1d,{0xbb,0xde,0x3f,0xbf,0x42,0xf4,0xa,0x6b}}");
+        cp.m_closeNoPingPongTcpConnections = false;
 
         m_netClient.Connect(cp);
     }
