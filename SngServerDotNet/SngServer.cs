@@ -9,7 +9,6 @@ namespace SngServer
     {
         public bool m_runLoop = true;
 
-        // #4
         public NetServer m_netServer = new();
 
         private readonly ThreadPool m_netWorkerThreadPool = new(8);
