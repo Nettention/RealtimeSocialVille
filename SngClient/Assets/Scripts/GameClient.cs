@@ -89,7 +89,7 @@ public partial class GameClient : MonoBehaviour
 
     void OnGUI_Logon()
     {
-        GUI.Label(new Rect(10, 10, 300, 70), "ProudNet sample: \nA Quite Basic Realtime social Ville");
+        GUI.Label(new Rect(10, 10, 300, 70), "ProudNet sample: \nA Quite Basic Realtime Social Ville");
         GUI.Label(new Rect(10, 60, 180, 30), "Server Address");
         m_serverAddr = GUI.TextField(new Rect(10, 80, 180, 30), m_serverAddr);
         GUI.Label(new Rect(10, 110, 180, 30), "World Name");
