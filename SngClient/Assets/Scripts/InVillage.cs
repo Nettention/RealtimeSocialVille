@@ -96,8 +96,8 @@ public partial class GameClient : MonoBehaviour
         if ((int)m_myP2PGroupID == groupID)
         {
             // plant a tree
-            GameObject o = (GameObject)Instantiate(m_treePrefab, position, Quaternion.identity);
-            WorldObject t = (WorldObject)o.GetComponent(typeof(WorldObject));
+            GameObject o = Instantiate(m_treePrefab, position, Quaternion.identity);
+            WorldObject t = o.GetComponent<WorldObject>();
             t.m_id = treeID;
             t.name = $"Tree:{treeID}";
         }
