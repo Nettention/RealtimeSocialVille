@@ -1,6 +1,7 @@
 ﻿using Nettention.Proud;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace SngServer
@@ -20,9 +21,9 @@ namespace SngServer
         internal SocialGameC2S.Stub m_C2SStub = new();
 
         internal object m_mutex = new();
-        private readonly Dictionary<String, Ville_S> m_villes = new();
+        private readonly Dictionary<string, Ville_S> m_nameToVilleMap = new();
         // guides which client is in which ville.
-        private readonly Dictionary<HostID, Ville_S> m_remoteClients = new();
+        private readonly Dictionary<HostID, Ville_S> m_clientToVilleMap = new();
 
         public SngServer()
         {
@@ -40,13 +41,11 @@ namespace SngServer
                 {
                     Console.WriteLine("OnClientLeave: {0}", clientInfo.hostID);
 
-                    Ville_S ville;
-
                     // remove the client and play info, and then remove the ville if it is empty.
-                    if (m_remoteClients.TryGetValue(clientInfo.hostID, out ville))
+                    if (m_clientToVilleMap.TryGetValue(clientInfo.hostID, out var ville))
                     {
                         ville.m_players.Remove(clientInfo.hostID);
-                        m_remoteClients.Remove(clientInfo.hostID);
+                        m_clientToVilleMap.Remove(clientInfo.hostID);
 
                         if (ville.m_players.Count == 0)
                         {
@@ -90,30 +89,46 @@ namespace SngServer
         {
             lock (m_mutex)
             {
-                // find the appropriate ville and join to it.
-                // if not found, then create a new ville.
-                Ville_S ville;
-                Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
-
-                if (m_villes.TryGetValue(villeName, out ville) == false)
+                if(m_clientToVilleMap.TryGetValue(remote, out var ville)==true)
                 {
-                    // create new one
-                    ville = new Ville_S();
-
-                    ville.m_p2pGroupID = m_netServer.CreateP2PGroup(list, new ByteArray()); // empty P2P groups. players will join it.
-
-                    Console.WriteLine("m_p2pGroupID : {0}", ville.m_p2pGroupID);
-
-                    NetClientInfo info = m_netServer.GetClientInfo(list.Last());
-                    Console.WriteLine("Client HostID : {0}, IP:Port : {1}:{2}", info.hostID, info.tcpAddrFromServer.IPToString(), info.tcpAddrFromServer.port);
-
-                    // load ville info
-                    m_villes.Add(villeName, ville);
-                    ville.m_name = villeName;
+                    m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)0, 0, "Already in a Ville."); // success
+                    return true;
                 }
 
+                // find the appropriate ville and join to it.
+                // if not found, then create a new ville.
+                if (m_nameToVilleMap.TryGetValue(villeName, out ville))
+                {
+                    // the player should yet to enter the ville.
+                    Debug.Assert(ville.m_players.ContainsKey(remote) == false);
+                }
+                else
+                {
+                    // create new one
+                    ville = new Ville_S
+                    {
+                        // create a new P2P group. players will enter it.
+                        m_p2pGroupID = m_netServer.CreateP2PGroup(new HostID[]{}, new ByteArray()), 
+                        m_name = villeName
+                    };
+
+                    // add the new Ville to map
+                    m_nameToVilleMap.Add(villeName, ville);
+                }
+                
+                ville.m_players.Add(remote, new RemoteClient_S());
+                m_clientToVilleMap.Add(remote, ville);
+
+                // now, the player can do P2P communication with other player in the same ville.
+                m_netServer.JoinP2PGroup(remote, ville.m_p2pGroupID);
+
                 m_S2CProxy.ReplyLogon(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, 0, ""); // success
-                MoveRemoteClientToLoadedVille(remote, ville);
+
+                // notify current world state to new user
+                foreach (var obj in ville.m_worldObjects)
+                {
+                    m_S2CProxy.NotifyAddTree(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, obj.Value.m_id, obj.Value.m_position);
+                }
 
                 return true; // any RMI stub implementation must always return true.
             }
@@ -127,7 +142,7 @@ namespace SngServer
                 Ville_S ville;
                 Nettention.Proud.HostID[] list = m_netServer.GetClientHostIDs();
                 WorldObject_S tree = new WorldObject_S();
-                if (m_remoteClients.TryGetValue(remote, out ville))
+                if (m_clientToVilleMap.TryGetValue(remote, out ville))
                 {
                     // add the tree
                     tree.m_position = position;
@@ -156,7 +171,7 @@ namespace SngServer
             {
                 // find the ville
                 Ville_S ville;
-                if (m_remoteClients.TryGetValue(remote, out ville))
+                if (m_clientToVilleMap.TryGetValue(remote, out ville))
                 {
                     // find the tree
                     WorldObject_S tree;
@@ -178,6 +193,9 @@ namespace SngServer
         }
         public void Start()
         {
+            // each Ville will have an empty P2P group first, so we allow empty P2P group option.
+            m_netServer.AllowEmptyP2PGroup(true);
+
             // fill server startup parameters
             StartServerParameter sp = new();
             sp.protocolVersion = new Nettention.Proud.Guid(SngCommon.Vars.g_sngProtocolVersion);
@@ -186,7 +204,7 @@ namespace SngServer
             sp.udpPorts.Add(9000);
             sp.serverAddrAtClient = "ec2-44-192-247-75.compute-1.amazonaws.com"; // TODO: Modify this value for your own server.
             sp.SetExternalNetWorkerThreadPool(m_netWorkerThreadPool);
-            sp.SetExternalUserWorkerThreadPool(m_userWorkerThreadPool);
+            sp.SetExternalUserWorkerThreadPool(m_userWorkerThreadPool);        
 
             //m_netServer.SetDefaultTimeoutTimeMs(1000 * 60 * 60);
             //m_netServer.SetMessageMaxLength(100000, 100000);
@@ -195,42 +213,20 @@ namespace SngServer
             m_netServer.Start(sp);
         }
 
-        public void MoveRemoteClientToLoadedVille(HostID remote, Ville_S ville)
-        {
-            lock (m_mutex)
-            {
-                RemoteClient_S remoteClientValue;
-                Ville_S villeValue;
-
-                if (ville.m_players.TryGetValue(remote, out remoteClientValue) == false && m_remoteClients.TryGetValue(remote, out villeValue) == false)
-                {
-                    ville.m_players.Add(remote, new RemoteClient_S());
-                    m_remoteClients.Add(remote, ville);
-                }
-
-                // now, the player can do P2P communication with other player in the same ville.
-                m_netServer.JoinP2PGroup(remote, ville.m_p2pGroupID);
-
-                // notify current world state to new user
-                foreach (var iWorldObject in ville.m_worldObjects)
-                {
-                    m_S2CProxy.NotifyAddTree(remote, RmiContext.ReliableSend, (int)ville.m_p2pGroupID, iWorldObject.Value.m_id, iWorldObject.Value.m_position);
-                }
-            }
-        }
+        
 
         public void UnloadVille(Ville_S ville)
         {
             lock (m_mutex)
             {
-                // ban the players in the ville
+                // kick out the players in the ville
                 foreach (KeyValuePair<HostID, RemoteClient_S> iPlayer in ville.m_players)
                 {
                     m_netServer.CloseConnection(iPlayer.Key);
                 }
 
                 // shutdown the loaded ville
-                m_villes.Remove(ville.m_name);
+                m_nameToVilleMap.Remove(ville.m_name);
 
                 // release the cached data tree
                 m_netServer.DestroyP2PGroup(ville.m_p2pGroupID);

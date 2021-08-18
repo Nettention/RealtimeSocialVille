@@ -6,3 +6,5 @@
 /SngClient/Assets/Plugins/*.meta
 /.vs/RealtimeSocialVille/DesignTimeBuild/*.v2
 /.vs/RealtimeSocialVille/v16/*.suo
+/SngClient_clone_*
+/SngClient/Assets/ParrelSync.meta
