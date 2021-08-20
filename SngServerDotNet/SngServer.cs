@@ -82,7 +82,7 @@ namespace SngServer
             }
         }
 
-        bool RequestLogon(HostID remote, RmiContext rmiContext, String villeName, bool isNewVille)
+        bool RequestLogon(HostID remote, RmiContext rmiContext, String villeName)
         {
             lock (m_mutex)
             {

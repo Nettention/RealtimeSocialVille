@@ -123,7 +123,7 @@ public partial class GameClient : MonoBehaviour
                     m_loginButtonText = "Logging on...";
 
                     // try to join the specified ville by name given by the user.
-                    m_C2SProxy.RequestLogon(HostID.HostID_Server, RmiContext.ReliableSend, m_villeName, false);
+                    m_C2SProxy.RequestLogon(HostID.HostID_Server, RmiContext.ReliableSend, m_villeName);
                 }
                 else
                 {
