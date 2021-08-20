@@ -8,8 +8,6 @@ namespace SngServer
 {
     public class SngServer : IDisposable
     {
-        public bool m_runLoop = true;
-
         public NetServer m_netServer = new();
 
         private readonly ThreadPool m_netWorkerThreadPool = new(8);

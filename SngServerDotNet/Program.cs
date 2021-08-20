@@ -17,9 +17,10 @@ namespace SngServer
                     server.Start();
                     Console.WriteLine("Server start ok.");
 
-                    while (server.m_runLoop)
+                    while (true)
                     {
-                        if (Console.KeyAvailable && Console.ReadKey(true).Key == ConsoleKey.Escape)
+                        if (Console.KeyAvailable 
+                            && Console.ReadKey(true).Key == ConsoleKey.Escape)
                         {
                             break;
                         }
