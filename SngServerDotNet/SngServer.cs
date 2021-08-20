@@ -10,9 +10,6 @@ namespace SngServer
     {
         public NetServer m_netServer = new();
 
-        private readonly ThreadPool m_netWorkerThreadPool = new(8);
-        private readonly ThreadPool m_userWorkerThreadPool = new(8);
-
         // RMI proxy for server-to-client messaging
         internal SocialGameS2C.Proxy m_S2CProxy = new();
         // RMI stub for client-to-server messaging
@@ -188,15 +185,8 @@ namespace SngServer
             // fill server startup parameters
             StartServerParameter sp = new();
             sp.protocolVersion = new Nettention.Proud.Guid(SngCommon.Vars.g_sngProtocolVersion);
-            sp.tcpPorts = new IntArray();
             sp.tcpPorts.Add(SngCommon.Vars.g_serverPort); // must be same to the port number at client
             sp.udpPorts.Add(9000);
-            sp.serverAddrAtClient = "ec2-44-192-247-75.compute-1.amazonaws.com"; // TODO: Modify this value for your own server.
-            sp.SetExternalNetWorkerThreadPool(m_netWorkerThreadPool);
-            sp.SetExternalUserWorkerThreadPool(m_userWorkerThreadPool);        
-
-            //m_netServer.SetDefaultTimeoutTimeMs(1000 * 60 * 60);
-            //m_netServer.SetMessageMaxLength(100000, 100000);
 
             // let's start!
             m_netServer.Start(sp);
