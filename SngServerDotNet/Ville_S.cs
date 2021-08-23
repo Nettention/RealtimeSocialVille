@@ -13,7 +13,6 @@ namespace SngServer
         public string m_name;
 
         // increases for every new world object is added.
-        // this value is saved to database, too.
         public int m_nextNewID = 1;
 
         // world objects
