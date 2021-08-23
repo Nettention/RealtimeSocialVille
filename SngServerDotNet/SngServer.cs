@@ -142,10 +142,10 @@ namespace SngServer
                 // add the tree
                 WorldObject_S tree = new();
                 tree.m_position = position;
-                tree.m_id = ville.m_nextNewID;
+                tree.m_id = ville.m_nextNewWorldObjectID;
 
                 ville.m_worldObjects.Add(tree.m_id, tree);
-                ville.m_nextNewID++;
+                ville.m_nextNewWorldObjectID++;
 
                 // notify the tree's creation to users
                 m_S2CProxy.NotifyAddTree(ville.m_players.Keys.ToArray(), RmiContext.ReliableSend, tree.m_id, tree.m_position);
