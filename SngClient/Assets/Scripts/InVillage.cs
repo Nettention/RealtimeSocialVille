@@ -17,7 +17,7 @@ public partial class GameClient : MonoBehaviour
     {
         // determine if clicked (release button)
         bool pushing = Input.GetMouseButton(0);
-        bool clicked = Input.GetMouseButtonUp(0);
+        bool clicked = Input.GetMouseButtonDown(0);
 
         // pick object
         var ray = Camera.main.ScreenPointToRay(Input.mousePosition);

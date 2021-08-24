@@ -185,14 +185,11 @@ namespace SngServer
             // fill server startup parameters
             StartServerParameter sp = new();
             sp.protocolVersion = new Nettention.Proud.Guid(SngCommon.Vars.g_sngProtocolVersion);
-            sp.tcpPorts.Add(SngCommon.Vars.g_serverPort); // must be same to the port number at client
-            sp.udpPorts.Add(9000);
+            sp.tcpPorts.Add(SngCommon.Vars.g_serverPort); // must be same to the port number at client            
 
             // let's start!
             m_netServer.Start(sp);
         }
-
-        
 
         public void UnloadVille(Ville_S ville)
         {
